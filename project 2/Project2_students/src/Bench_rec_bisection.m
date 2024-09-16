@@ -1,0 +1,156 @@
+% Benchmark for recursively partitioning meshes, based on various
+% bisection approaches
+%
+% D.P & O.S for Numerical Computing at USI
+
+% add necessary paths
+addpaths_GP;
+
+% the powers of 2
+nlevels_a = 3;
+nlevels_b = 4;
+
+fprintf('       *********************************************\n')
+fprintf('       ***  Recursive graph bisection benchmark  ***\n');
+fprintf('       *********************************************\n')
+
+% load cases
+cases = {
+%       'mesh1e1.mat',
+%       'bodyy4.mat',
+%       'de2010.mat',
+%       'biplane-9.mat',
+%       'L-9.mat',
+    };
+
+nc = length(cases);
+maxlen = 0;
+for c = 1:nc
+    if length(cases{c}) > maxlen
+        maxlen = length(cases{c});
+    end
+end
+
+for c = 1:nc
+    fprintf('.');
+    sparse_matrices(c) = load(cases{c});
+end
+
+
+fprintf('\n\n Report Cases         Nodes     Edges\n');
+fprintf(repmat('-', 1, 40));
+fprintf('\n');
+for c = 1:nc
+    spacers  = repmat('.', 1, maxlen+3-length(cases{c}));
+    [params] = Initialize_case(sparse_matrices(c));
+    fprintf('%s %s %10d %10d\n', cases{c}, spacers,params.numberOfVertices,params.numberOfEdges);
+end
+
+%% Create results table
+fprintf('\n%7s %16s %20s %16s %16s\n','Bisection','Spectral','Metis 5.0.2','Coordinate','Inertial');
+fprintf('%10s %10d %6d %10d %6d %10d %6d %10d %6d\n','Partitions',8,16,8,16,8,16,8,16);
+fprintf(repmat('-', 1, 100));
+fprintf('\n');
+
+
+for c = 1:nc
+    spacers = repmat('.', 1, maxlen+3-length(cases{c}));
+    fprintf('%s %s', cases{c}, spacers);
+    sparse_matrix = load(cases{c});
+    
+
+    % Recursively bisect the loaded graphs in 8 and 16 subgraphs.
+    % Steps
+    % 1. Initialize the problem
+    [params] = Initialize_case(sparse_matrices(c));
+    W      = params.Adj;
+    coords = params.coords; 
+
+    % 2. Recursive routines
+    % i. Spectral
+    % p = 8
+    [map_spectral1, sepij1, sepA1] = rec_bisection(@bisection_spectral, nlevels_a, W, coords, 1);
+    % p = 16
+    [map_spectral2, sepij2, sepA2] = rec_bisection(@bisection_spectral, nlevels_b, W, coords, 1);
+
+    % ii. Metis
+    % p = 8
+    [map_metis1, sepij3, sepA3] = rec_bisection(@bisection_metis, nlevels_a, W, coords, 1);
+    % p = 16
+    [map_metis2, sepij4, sepA4] = rec_bisection(@bisection_metis, nlevels_b, W, coords, 1);
+    
+    % iii. Coordinate
+    % p = 8
+    [map_coordinate1, sepij5, sepA5] = rec_bisection(@bisection_coordinate, nlevels_a, W, coords, 1);
+    % p = 16
+    [map_coordinate2, sepij6, sepA6] = rec_bisection(@bisection_coordinate, nlevels_b, W, coords, 1);
+
+
+    % iv. Inertial
+    % p = 8
+    [map_inertial1, sepij7, sepA7] = rec_bisection(@bisection_inertial, nlevels_a, W, coords, 1);
+    % p = 16
+    [map_inertial2, sepij8, sepA8] = rec_bisection(@bisection_inertial, nlevels_b, W, coords, 1);
+
+
+    % 3. Calculate number of cut edges
+    % p = 8
+    [spectral1, ~] = cutsize(W, map_spectral1);
+    [metis1, ~] = cutsize(W, map_metis1);
+    [coordinate1, ~] = cutsize(W, map_coordinate1);
+    [inertial1, ~] = cutsize(W, map_inertial1);
+
+    % p = 16
+    [spectral2, ~] = cutsize(W, map_spectral2);
+    [metis2, ~] = cutsize(W, map_metis2);
+    [coordinate2, ~] = cutsize(W, map_coordinate2);
+    [inertial2, ~] = cutsize(W, map_inertial2);
+
+
+    % 4. Visualize the partitioning result
+    
+    disp(' Intertial (p = 8) ...');
+    gplotmap(W, coords, map_inertial1);
+    title(' Intertial (p = 8)');
+    pause;
+    
+    disp(' Intertial (p = 16) ...');
+    gplotmap(W, coords, map_inertial2);
+    title(' Intertial (p = 16)');
+    pause;
+    
+    disp(' Coordinate (p = 8) ...');
+    gplotmap(W, coords, map_coordinate1);
+    disp(' Coordinate (p = 8)');
+    pause;
+    
+    disp(' Coordinate (p = 16) ...');
+    gplotmap(W, coords, map_coordinate2);
+    title(' Coordinate (p = 16)');
+    pause;
+    
+    disp(' Metis (p = 8) ...');
+    gplotmap(W, coords, map_metis1);
+    title(' Metis (p = 8)');
+    pause;
+    
+    disp(' Metis (p = 16) ...');
+    gplotmap(W, coords, map_metis2);
+    title(' Metis (p = 16)');
+    pause;
+    
+    disp(' Spectral (p = 8) ...');
+    gplotmap(W, coords, map_spectral1);
+    title(' Spectral (p = 8)');
+    pause;
+
+    disp(' Spectral (p = 16) ...');
+    gplotmap(W, coords, map_spectral2);
+    disp(' Spectral (p = 16)');
+    pause;
+
+%     disp("spectral1  spectral 2 metis1  metis2  coordinate1  coordinate2  inertial1  inertial2");
+%     fprintf('%6d %6d %10d %6d %10d %6d %10d %6d\n', spectral1, spectral2,...
+%     metis1, metis2, coordinate1, coordinate2, inertial1, inertial2);
+    
+end
